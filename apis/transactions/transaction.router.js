@@ -7,6 +7,7 @@ const crypto = require("crypto");
 const randomize = require('randomatic');
 const LiveTransactionModel = require('./liveTransactions.model')
 const RunningBalanceModel = require('../accounts/runningBanlance.model');
+const liveTransactionsModel = require('./liveTransactions.model');
 //const { where } = require('sequelize/types');
 
 transactionsRoute.use(cors());
@@ -59,12 +60,13 @@ transactionsRoute.post('/deposit', (req, res) => {
     .then(response => {
         console.log(response.message)
 
-        if(response.message == 'Ip is not authorized'){
-            const transaction_id = crypto.randomBytes(14).toString('hex');
+        if(response.message == 'Transaction is being processed'){
+            const transaction_id = crypto.randomBytes(15).toString('hex');
             LiveTransactionModel.create({
                 id: transaction_id,
                 msisdn: msisdn,
                 transaction_ref: transactionId,
+                payLeoReferenceId: '',
                 amount: amount,
                 business_code: business_code,
                 transaction_type: 'Customer Push',
@@ -73,40 +75,19 @@ transactionsRoute.post('/deposit', (req, res) => {
                 created_at: today,
                 time_at: currentTime
             })
-            .then(trans => {
-                const runningBalance_id = crypto.randomBytes(14).toString('hex');
+            .then(() => {
+                const runningBalance_id = crypto.randomBytes(15).toString('hex');
                 RunningBalanceModel.create({
                     id: runningBalance_id,
                     business_code: business_code,
-                    old_balance: '0',
+                    old_balance: amount,
                     new_balance: amount,
                     transaction_ref: transactionId,
-                    description: 'Your account has been credited with UGX ' + amount + ' by' + msisdn,
+                    payee_msisdn: msisdn,
+                    description: 'Your account has been credited with UGX ' + amount + ' by ' + msisdn,
                     created_at: today + " " + currentTime
-                })
-                .then(rb => {
-                    RunningBalanceModel.findOne({
-                        where: {
-                            transaction_ref: transactionId,
-                            business_code: business_code
-                        }
-                    })
-                    .then(balance => {
-                        if(balance){
-                            RunningBalanceModel.update({
-                                new_balance: (balance.old_balance - 0) + (amount -0),
-                                old_balance: balance.new_balance
-                            }, {
-                                  where: {
-                                    transaction_ref: transactionId,
-                                    business_code: business_code
-                                  }
-                                }
-                            );
-                        }
-                    });
-                })
-            })
+                });
+            });
         }
         res.json({
             status : response.status,
@@ -118,21 +99,59 @@ transactionsRoute.post('/deposit', (req, res) => {
 });
 
 ///////////////////////////////update from pay-leo/////////////////////////////////////////////////////
-transactionsRoute.post('/deposit/update', (req, res) => {
+transactionsRoute.post('/deposit/update', (req, res, body) => {
 
-    var data = '';
-    req.setEncoding('utf8');
-    xml = req.rawBody = data;
-
-    //var xml = '<?xml version="1.0" encoding="UTF-8"?> <request><method>receivePayment</method><msisdn>256780289560</msisdn><transactionId>1399329291991912​</transactionId><referenceId>32432432423423222</referenceId><amount>500</amount><client_transaction>39293292142323​</client_transaction></request>';
-    payLeoResponse(xml, function(error, result){
-        if(error){
-            console.log("Error: " + error)
-            return;
-        }
-        console.dir(JSON.stringify(result))
-        res.json(result);
-    });
+    // Any request with an XML payload will be parsed
+    // and a JavaScript object produced on req.body
+    // corresponding to the request payload.
+    console.log(req.body);
+    var response = req.body.request;
+    
+    if(response['method'] == 'receivePayment'){
+        liveTransactionsModel.update({
+            transaction_status: 'success',
+            payLeoReferenceId: response['referenceid'],
+        },{
+            where: {
+                transaction_ref: response['client_transaction'],
+                msisdn: response['msisdn'],
+                amount: response['amount']
+            }
+        }).then(() => {
+            RunningBalanceModel.findOne({
+                where: {
+                    transaction_ref: response['client_transaction'],
+                    payee_msisdn: response['msisdn'],
+                }
+            })
+            .then(trans => {
+                if(trans){
+                    RunningBalanceModel.update({
+                        new_balance: (Number(trans.old_balance) + (response['amount'] -0)).toString(),
+                        old_balance: trans.new_balance
+                    }, {
+                          where: {
+                            transaction_ref: response['client_transaction'],
+                          }
+                        }
+                    );
+                }
+            });
+        });
+    }
+    else{
+        liveTransactionsModel.update({
+            transaction_status: 'failed'
+        },{
+            where: {
+                transaction_ref: response['client_transaction'],
+                msisdn: response['msisdn'],
+                amount: response['amount']
+            }
+        })
+    }
+    
+    res.status(200).end();
 });
 
 /////////////////////////////////////Get all transactions//////////////////////////////////////////////////////////////

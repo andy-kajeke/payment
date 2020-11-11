@@ -14,6 +14,9 @@ module.exports = db.sequelize.define(
         transaction_ref: {
             type: Sequelize.STRING
         },
+        payLeoReferenceId: {
+            type: Sequelize.STRING
+        },
         amount: {
             type: Sequelize.STRING
         },

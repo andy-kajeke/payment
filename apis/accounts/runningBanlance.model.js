@@ -20,6 +20,9 @@ module.exports = db.sequelize.define(
         transaction_ref: {
             type: Sequelize.STRING
         },
+        payee_msisdn: {
+            type: Sequelize.STRING
+        },
         description: {
             type: Sequelize.STRING
         }, 
