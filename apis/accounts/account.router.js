@@ -6,7 +6,7 @@ const AccountsRoute = express.Router();
 const crypto = require("crypto");
 const randomize = require('randomatic');
 const WithdrawModel = require('./withdraws.model')
-//const { where } = require('sequelize/types');
+const LiveTransactionModel = require('../transactions/liveTransactions.model')
 
 AccountsRoute.use(cors());
 

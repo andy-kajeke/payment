@@ -13,17 +13,6 @@ const liveTransactionsModel = require('./liveTransactions.model');
 
 transactionsRoute.use(cors());
 
-var con = mysql.createConnection({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME
-});
-
-con.connect(function(err) {
-  if (err) throw err;
-});
-
 ////////////////////////////////////Date and time//////////////////////////////////////////////////////////////
 var date = new Date();
 var monthNames = ["January", "February", "March", "April", "May", "June",
@@ -247,48 +236,57 @@ transactionsRoute.get('/:busness_code', (req, res) => {
 
 /////////////////////////////////////Get all transactions value//////////////////////////////////////////////////////////////
 transactionsRoute.get('/gpaid/Vendors/all/depositValue', (req, res) => {
-    con.connect(function(err) {
-        con.query(`SELECT SUM(amount) FROM liveTransactions WHERE transaction_status = 'Sucess' AND month = '${monthNames[date.getMonth()]}' AND year = '${date.getFullYear()}'`,
-         function (err, actaulBalance, fields) {
-          if (err) throw err;
-
-          if(actaulBalance[0]['SUM(amount)'] == null){
-            res.json({money: '0.00'});
-          }
-          else{
-            res.json({money: actaulBalance[0]['SUM(amount)']});
-          }
-          
-        });
-      });
+    LiveTransactionModel.sum(
+        'amount', 
+        {
+            where: { 
+                transaction_status: 'pending', 
+                month: monthNames[date.getMonth()], 
+                year: date.getFullYear()
+            }
+        }
+    ).then(money => {res.json({money})})
 });
 
 /////////////////////////////////////Get all transactions value by business code/////////////////////////////////////////////
-transactionsRoute.get('/gpaidVendors/all/depositValue/:business_code', (req, res) => {
-    con.connect(function(err) {
-        con.query(`SELECT SUM(amount) FROM liveTransactions WHERE transaction_status = 'Sucess' AND month = '${monthNames[date.getMonth()]}' AND year = '${date.getFullYear()}' AND business_code = ${req.params.business_code}`, 
-        function (err, actaulBalance, fields) {
-          if (err) throw err;
+transactionsRoute.get('/gpaidVendors/all/depositValue/:business_code', (req, res) => {    
+LiveTransactionModel.sum(
+            'amount', 
+            {
+                where: { 
+                    business_code: req.params.business_code,
+                    transaction_status: 'pending', 
+                    month: monthNames[date.getMonth()], 
+                    year: date.getFullYear()
+                }
+            }
+        ).then(money => {
+            res.json({money})
+            console.log(money)
 
-          if(actaulBalance[0]['SUM(amount)'] == null){
-            con.query(`UPDATE accountBalances SET actual_balance = '0.00', available_balance = '0.00' WHERE business_code = ${req.params.business_code}`, 
-            function (err, fields){});
+            if(money == null){
+                AccountsModel.update({
+                    actual_balance: '0.00',
+                    commission: '0.00',
+                    available_balance: '0.00'
+                },{
+                    where: {business_code: req.params.business_code}
+                });
+            }else{
+                var actual = money;
+                var comm = (money) * (5 / 100);
+                var available = actual - comm;
 
-            res.json({money: '0.00'});
-          }
-          else{
-            let commission = (actaulBalance[0]['SUM(amount)']) * (5 / 100);
-            let available_balance = (actaulBalance[0]['SUM(amount)']) - commission;
-
-            con.query(`UPDATE accountBalances SET actual_balance = ${(actaulBalance[0]['SUM(amount)']).toString()}, 
-            available_balance = ${available_balance.toString()}, commission = ${commission.toString()}
-             WHERE business_code = ${req.params.business_code}`, 
-            function (err, fields){});
-
-            res.json({money: actaulBalance[0]['SUM(amount)']});
-          }
+                AccountsModel.update({
+                    actual_balance: actual,
+                    commission: comm,
+                    available_balance: available,
+                    created_at: today + ' ' + currentTime
+                },{
+                    where: {business_code: req.params.business_code}
+                });
+            }
         });
-      });
 });
 
 /////////////////////////////////////Get all transactions//////////////////////////////////////////////////////////////
