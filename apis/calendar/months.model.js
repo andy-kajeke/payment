@@ -2,25 +2,13 @@ const Sequelize = require('sequelize');
 const db = require('../../config/db_config');
 
 module.exports = db.sequelize.define(
-    'accountBalances', {
+    'months', {
         id: {
             type: Sequelize.STRING,
             primaryKey: true,
             //autoIncrement: true
         },
-        business_code: {
-            type: Sequelize.STRING
-        },
-        business_name: {
-            type: Sequelize.STRING
-        },
-        actual_balance: {
-            type: Sequelize.STRING
-        },
-        commission: {
-            type: Sequelize.STRING
-        },
-        available_balance: {
+        month: {
             type: Sequelize.STRING
         },
         created_at: {

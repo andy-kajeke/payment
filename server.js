@@ -22,7 +22,11 @@ app.listen(process.env.APP_PORT, () => {
 const usersRouter = require('./apis/users/users.router');
 const branchRouter = require('./apis/branches/branches.router');
 const transactionRouter = require('./apis/transactions/transaction.router');
+const accountRouter = require('./apis/accounts/account.router');
+const calendarRouter = require('./apis/calendar/calendar.router');
 
 app.use('/webapi/user', usersRouter);
 app.use('/webapi/branches', branchRouter);
 app.use('/webapi/transaction', transactionRouter);
+app.use('/webapi/account', accountRouter);
+app.use('/webapi/calendar', calendarRouter);

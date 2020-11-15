@@ -46,7 +46,7 @@ usersRoute.post('/admin-vendors/create_account', (req, res) => {
         if (!user) {
             AdminGpaidVendorModel.create(adminData)
                 .then(user => {
-                    res.json({ status: user.username + ' registered' });
+                    res.json({ message: user.username + ' has been registered...!! ' + 'login now' });
                 })
                 .catch(err => {
                     res.send('error: ' + err);
@@ -81,7 +81,7 @@ usersRoute.post('/admin-branch/create_account', (req, res) => {
             if (!user) {
                 AdminBranchModel.create(adminData)
                     .then(user => {
-                        res.json({ status: user.username + ' registered' });
+                        res.json({ message: user.username + ' registered' });
                     })
                     .catch(err => {
                         res.send('error: ' + err);
@@ -108,15 +108,15 @@ usersRoute.post('/admin-vendors/login', (req, res) => {
                     let token = jwt.sign(user.dataValues, process.env.SECURITY_KEY, {
                         expiresIn: "14days"
                     });
-                    //res.send(token);
-                    res.json({
-                        is_user: true,
-                        id: user.id,
-                        username: user.username,
-                        email: user.email,
-                        message: 'Logged in successfully',
-                        userToken: token
-                    });
+                    res.send(token);
+                    // res.json({
+                    //     is_user: true,
+                    //     id: user.id,
+                    //     username: user.username,
+                    //     email: user.email,
+                    //     message: 'Logged in successfully',
+                    //     userToken: token
+                    // });
                 } else {
                     res.json({
                         is_user: false,

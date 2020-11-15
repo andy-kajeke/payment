@@ -32,6 +32,12 @@ module.exports = db.sequelize.define(
         payment_reason: {
             type: Sequelize.STRING
         },
+        month: {
+            type: Sequelize.STRING
+        },
+        year: {
+            type: Sequelize.STRING
+        },
         created_at: {
             type: Sequelize.STRING
         },

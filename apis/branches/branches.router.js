@@ -4,6 +4,7 @@ const BranchRoute = express.Router();
 const crypto = require("crypto");
 const randomize = require('randomatic');
 const BranchModel = require('./branches.model');
+const AccountsModel = require('../accounts/accountBanlance.model');
 
 BranchRoute.use(cors());
 
@@ -24,6 +25,7 @@ var currentTime = hours + ':' + minutes + ':' + seconds + ' ' + ampm;
 /////////////////////////////////////Adding new branches//////////////////////////////////////////
 BranchRoute.post('/register', (req, res) => {
     const branch_id = crypto.randomBytes(15).toString('hex');
+    const account_id = crypto.randomBytes(15).toString('hex');
     var business_code = randomize('0', 5);
 
     const branchData = {
@@ -49,27 +51,24 @@ BranchRoute.post('/register', (req, res) => {
         time_at: currentTime
     }
 
-    BranchModel.findOne({
-            where: {
-                email: req.body.email
-            }
-        })
-        .then(branch => {
-            if (!branch) {
-                BranchModel.create(branchData)
-                    .then(branch => {
-                        res.json({ message: branch.business_name + ' registered' });
-                    })
-                    .catch(err => {
-                        res.send('error: ' + err);
-                    })
-            } else {
-                res.json({ message: 'Business code already exists' });
-            }
-        })
-        .catch(err => {
-            res.send('error: ' + err);
-        })
+    const accountsData = {
+        id: account_id,
+        business_code: business_code,
+        business_name: req.body.business_name,
+        actual_balance: '0.00',
+        available_balance: '0.00',
+        created_at: today + ' ' + currentTime
+    }
+
+    BranchModel.create(branchData)
+    .then(() => {
+        res.json({ message: 'Registered..!!' });
+        AccountsModel.create(accountsData);
+    })
+    .catch(err => {
+        res.send('error: ' + err);
+    })
+
 });
 
 /////////////////////////////////////Get all registered branches////////////////////////////////////////////////
