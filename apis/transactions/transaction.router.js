@@ -1,6 +1,5 @@
 const express = require('express');
 const cors = require('cors');
-const mysql = require('mysql');
 const fetch = require('node-fetch');
 const transactionsRoute = express.Router();
 const crypto = require("crypto");
@@ -33,14 +32,14 @@ var currentTime = hours + ':' + minutes + ':' + seconds + ' ' + ampm;
 
 /////////////////////////////////////Allow users to get payments or deposit///////////////////////////////////////////
 transactionsRoute.post('/deposit', (req, res) => {
-    var url = 'https://vendors.pay-leo.com/api/v2/test/deposit';
+    var url = 'https://vendors.pay-leo.com/api/v2/live/deposit';
     var msisdn = req.body.msisdn;
     var amount = req.body.amount;
     var merchantCode = "07513";
     var transactionId = randomize('0', 15);
     var consumerKey = "JDJ5cITHiCQqbOfQAbD9fF743M1601732533";
     var consumerSecret = "Af5plbxBSETqm1gZUDPJYz8W3d1601732533";
-    var narration = "testing";
+    var narration = "Service payment";
     var data = url + "&" + msisdn + "&" + amount + "&" + merchantCode + "&" + transactionId + "&" + narration;
     var auth_signature =  crypto.createHmac('sha256', consumerSecret).update(data).digest('hex');
 
@@ -56,13 +55,60 @@ transactionsRoute.post('/deposit', (req, res) => {
         narration: narration
     } 
 
-    fetch('https://vendors.pay-leo.com/api/v2/test/deposit/', {
+    if(msisdn == ''){
+        res.json({
+            status: 'Failed',
+            code: 204,
+            message: 'Missing required parameters'
+        });
+    }
+    else if(amount == '')
+    {
+        res.json({
+            status: 'Failed',
+            code: 204,
+            message: 'Missing required parameters'
+        });
+    }
+    else if(business_code == '')
+    {
+        res.json({
+            status: 'Failed',
+            code: 204,
+            message: 'Missing required parameters'
+        });
+    }
+    else if(msisdn.toString().length < 12)
+    {
+        res.json({
+            status: 'Failed',
+            code: 204,
+            message: 'Ivaild msisdn. msisdn is either incomplete or doesnot begin with 256'
+        });
+    }
+    else if(msisdn.toString().length > 12)
+    {
+        res.json({
+            status: 'Failed',
+            code: 204,
+            message: 'Ivaild msisdn. msisdn exceeds 12 digits'
+        });
+    }
+    else if(msisdn == '' && amount == '' && business_code == '')
+    {
+        res.json({
+            status: 'Failed',
+            code: 204,
+            message: 'Missing required parameters'})
+    }
+    else{
+        fetch('https://vendors.pay-leo.com/api/v2/live/deposit/', {
         method: 'POST',
-        body: JSON.stringify(depositData),
+        body: JSON.stringify(depositData), 
         headers: { 'Content-Type': 'application/json' }
-    })
-    .then(res => res.json())
-    .then(response => {
+        })
+        .then(res => res.json())
+        .then(response => {
         console.log(response.message)
         //response.message == "Transaction is being processed"
         //response.message == "Ip is not authorized"
@@ -97,6 +143,16 @@ transactionsRoute.post('/deposit', (req, res) => {
                     created_at: today + " " + currentTime
                 });
             });
+
+            res.json({
+                status: 'OK',
+                code: 200,
+                message: 'Transaction is being processed',
+                transactionId: transactionId
+            })
+        }
+        else{
+            res.json({message : 'Failed try again..'})
         }
         res.json({
             status : response.status,
@@ -105,6 +161,8 @@ transactionsRoute.post('/deposit', (req, res) => {
             transactionId : response.transactionId
         })
     });
+    }
+    
 });
 
 ///////////////////////////////update from pay-leo/////////////////////////////////////////////////////
@@ -115,7 +173,8 @@ transactionsRoute.post('/deposit/update', (req, res, body) => {
     // corresponding to the request payload.
     console.log(req.body);
     var response = req.body.request;
-    
+    res.send(JSON.parse(req.body));
+
     if(response['method'] == 'receivePayment'){
         liveTransactionsModel.findOne({
             where: {
@@ -132,11 +191,19 @@ transactionsRoute.post('/deposit/update', (req, res, body) => {
                 }
             }).then(() => {
                 
-                res.status(200).end();
+                
             });
         })
+
+        res.json({
+            method: response['method'],
+            msisdn: response['msisdn'],
+            amount: response['amount'],
+            transactionId: response['client_transaction'],
+            message: response['message']
+        })
     }
-    else{
+    else if(response['method'] == 'notifyFailedPayment'){
         liveTransactionsModel.findOne({
             where: {
                 transaction_ref: response['client_transaction'],
@@ -153,6 +220,16 @@ transactionsRoute.post('/deposit/update', (req, res, body) => {
             })
         });
         
+        res.json({
+            method: response['method'],
+            msisdn: response['msisdn'],
+            amount: response['amount'],
+            transactionId: response['client_transaction'],
+            message: response['message']
+        })
+    }
+    else{
+        res.json({message: 'Something went wrong'});
     }
     
     res.status(200).end(); 
@@ -240,7 +317,7 @@ transactionsRoute.get('/gpaid/Vendors/all/depositValue', (req, res) => {
         'amount', 
         {
             where: { 
-                transaction_status: 'pending', 
+                transaction_status: 'Success', 
                 month: monthNames[date.getMonth()], 
                 year: date.getFullYear()
             }
@@ -255,7 +332,7 @@ LiveTransactionModel.sum(
             {
                 where: { 
                     business_code: req.params.business_code,
-                    transaction_status: 'pending', 
+                    transaction_status: 'Success', 
                     month: monthNames[date.getMonth()], 
                     year: date.getFullYear()
                 }

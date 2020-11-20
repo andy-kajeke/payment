@@ -1,6 +1,5 @@
 const express = require('express');
 const cors = require('cors');
-const mysql = require('mysql');
 const fetch = require('node-fetch');
 const AccountsRoute = express.Router();
 const crypto = require("crypto");
@@ -9,17 +8,6 @@ const WithdrawModel = require('./withdraws.model')
 const LiveTransactionModel = require('../transactions/liveTransactions.model')
 
 AccountsRoute.use(cors());
-
-var con = mysql.createConnection({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME
-});
-
-con.connect(function(err) {
-  if (err) throw err;
-});
 
 ////////////////////////////////////Date and time//////////////////////////////////////////////////////////////
 var date = new Date();
