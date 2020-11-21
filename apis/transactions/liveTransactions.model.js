@@ -38,6 +38,9 @@ module.exports = db.sequelize.define(
         year: {
             type: Sequelize.STRING
         },
+        callback_url: {
+            type: Sequelize.STRING
+        },
         created_at: {
             type: Sequelize.STRING
         },

@@ -59,6 +59,9 @@ module.exports = db.sequelize.define(
         bank_accountNumber: {
             type: Sequelize.STRING
         },
+        callback_url: {
+            type: Sequelize.STRING
+        },
         created_at: {
             type: Sequelize.STRING
         },

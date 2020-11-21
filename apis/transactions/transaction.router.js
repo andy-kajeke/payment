@@ -8,6 +8,7 @@ const LiveTransactionModel = require('./liveTransactions.model')
 const RunningBalanceModel = require('../accounts/runningBanlance.model');
 const AccountsModel = require('../accounts/accountBanlance.model');
 const liveTransactionsModel = require('./liveTransactions.model');
+const BranchModel = require('../branches/branches.model');
 //const { where } = require('sequelize/types');
 
 transactionsRoute.use(cors());
@@ -35,11 +36,11 @@ transactionsRoute.post('/deposit', (req, res) => {
     var url = 'https://vendors.pay-leo.com/api/v2/live/deposit';
     var msisdn = req.body.msisdn;
     var amount = req.body.amount;
-    var merchantCode = "07513";
+    var merchantCode = process.env.MerchantCode;
     var transactionId = randomize('0', 15);
-    var consumerKey = "JDJ5cITHiCQqbOfQAbD9fF743M1601732533";
-    var consumerSecret = "Af5plbxBSETqm1gZUDPJYz8W3d1601732533";
-    var narration = "Service payment";
+    var consumerKey = process.env.ConsumerKey;
+    var consumerSecret = process.env.ConsumerSecret;
+    var narration = process.env.Narration;
     var data = url + "&" + msisdn + "&" + amount + "&" + merchantCode + "&" + transactionId + "&" + narration;
     var auth_signature =  crypto.createHmac('sha256', consumerSecret).update(data).digest('hex');
 
@@ -57,7 +58,7 @@ transactionsRoute.post('/deposit', (req, res) => {
 
     if(msisdn == ''){
         res.json({
-            status: 'Failed',
+            status: 'FAILED',
             code: 204,
             message: 'Missing required parameters'
         });
@@ -65,7 +66,7 @@ transactionsRoute.post('/deposit', (req, res) => {
     else if(amount == '')
     {
         res.json({
-            status: 'Failed',
+            status: 'FAILED',
             code: 204,
             message: 'Missing required parameters'
         });
@@ -73,7 +74,7 @@ transactionsRoute.post('/deposit', (req, res) => {
     else if(business_code == '')
     {
         res.json({
-            status: 'Failed',
+            status: 'FAILED',
             code: 204,
             message: 'Missing required parameters'
         });
@@ -81,7 +82,7 @@ transactionsRoute.post('/deposit', (req, res) => {
     else if(msisdn.toString().length < 12)
     {
         res.json({
-            status: 'Failed',
+            status: 'FAILED',
             code: 204,
             message: 'Ivaild msisdn. msisdn is either incomplete or doesnot begin with 256'
         });
@@ -89,7 +90,7 @@ transactionsRoute.post('/deposit', (req, res) => {
     else if(msisdn.toString().length > 12)
     {
         res.json({
-            status: 'Failed',
+            status: 'FAILED',
             code: 204,
             message: 'Ivaild msisdn. msisdn exceeds 12 digits'
         });
@@ -97,7 +98,7 @@ transactionsRoute.post('/deposit', (req, res) => {
     else if(msisdn == '' && amount == '' && business_code == '')
     {
         res.json({
-            status: 'Failed',
+            status: 'FAILED',
             code: 204,
             message: 'Missing required parameters'})
     }
@@ -114,45 +115,66 @@ transactionsRoute.post('/deposit', (req, res) => {
         //response.message == "Ip is not authorized"
 
         if(response.message == "Transaction is being processed"){
-            const transaction_id = crypto.randomBytes(15).toString('hex');
-            LiveTransactionModel.create({
-                id: transaction_id,
-                msisdn: msisdn,
-                transaction_ref: transactionId,
-                payLeoReferenceId: '',
-                amount: amount + '.00',
-                business_code: business_code,
-                transaction_type: 'Credit',
-                transaction_status: 'Pending',
-                payment_reason: 'Service payment',
-                month: monthNames[date.getMonth()], 
-                year: date.getFullYear(),
-                created_at: today,
-                time_at: currentTime
-            })
-            .then(() => {
-                const runningBalance_id = crypto.randomBytes(15).toString('hex');
-                RunningBalanceModel.create({
-                    id: runningBalance_id,
-                    business_code: business_code,
-                    old_balance: amount,
-                    new_balance: amount,
-                    transaction_ref: transactionId,
-                    payee_msisdn: msisdn,
-                    description: 'Your account has been credited with UGX ' + amount + ' by ' + msisdn,
-                    created_at: today + " " + currentTime
-                });
-            });
+            BranchModel.findOne({
+                where: {
+                    business_code: business_code
+                }
+            }).then(branch => {
+                if(branch){
+                    const transaction_id = crypto.randomBytes(15).toString('hex');
+                    LiveTransactionModel.create({
+                        id: transaction_id,
+                        msisdn: msisdn,
+                        transaction_ref: transactionId,
+                        payLeoReferenceId: '',
+                        amount: amount + '.00',
+                        business_code: business_code,
+                        transaction_type: 'Credit',
+                        transaction_status: 'PENDING',
+                        payment_reason: 'Service payment',
+                        month: monthNames[date.getMonth()], 
+                        year: date.getFullYear(),
+                        callback_url: branch.callback_url,
+                        created_at: today,
+                        time_at: currentTime
+                    })
+                    .then(() => {
+                        const runningBalance_id = crypto.randomBytes(15).toString('hex');
+                        RunningBalanceModel.create({
+                            id: runningBalance_id,
+                            business_code: business_code,
+                            old_balance: amount,
+                            new_balance: amount,
+                            transaction_ref: transactionId,
+                            payee_msisdn: msisdn,
+                            description: 'Your account has been credited with UGX ' + amount + ' by ' + msisdn,
+                            created_at: today + " " + currentTime
+                        });
+                    });
 
-            res.json({
-                status: 'OK',
-                code: 200,
-                message: 'Transaction is being processed',
-                transactionId: transactionId
-            })
+                    res.json({
+                        status: 'OK',
+                        code: 200,
+                        message: 'Transaction is being processed',
+                        transactionId: transactionId
+                    })
+                }
+                else{
+                    res.json({
+                        status: 'FAILED',
+                        code: 204,
+                        message: 'business_code doesnot exist!!..'
+                    });
+                }
+            });
+            
         }
         else{
-            res.json({message : 'Failed try again..'})
+            res.json({
+                status: 'FAILED',
+                code: 204,
+                message : 'Something went wrong try again or contact service provider for help'
+            });
         }
         res.json({
             status : response.status,
@@ -181,27 +203,41 @@ transactionsRoute.post('/deposit/update', (req, res, body) => {
                 transaction_ref: response['client_transaction'],
                 msisdn: response['msisdn']
             }
-        }).then(() => {
-            liveTransactionsModel.update({
-                transaction_status: 'Success',
-                payLeoReferenceId: response['referenceid']
-            },{
-                where: {
-                    transaction_ref: response['client_transaction']
-                }
-            }).then(() => {
-                
-                
-            });
-        })
-
-        res.json({
-            method: response['method'],
-            msisdn: response['msisdn'],
-            amount: response['amount'],
-            transactionId: response['client_transaction'],
-            message: response['message']
-        })
+        }).then(trans => {
+            if(trans){
+                liveTransactionsModel.update({
+                    transaction_status: 'SUCCESS',
+                    payLeoReferenceId: response['referenceid']
+                },{
+                    where: {
+                        transaction_ref: response['client_transaction']
+                    }
+                }).then(() => {
+                    const callbackResponseData = {
+                        method: response['method'],
+                        msisdn: response['msisdn'],
+                        amount: response['amount'],
+                        transactionId: response['client_transaction'],
+                        message: response['message']
+                    }
+    
+                    fetch(trans.callback_url, {
+                        method: 'POST',
+                        body: JSON.stringify(callbackResponseData), 
+                        headers: { 'Content-Type': 'application/json' }
+                    })
+                    .then(res => res.json())
+                    .then(response => {});
+                });
+            }
+            else{
+                res.json({
+                    status: 'FAILED',
+                    code: 204,
+                    message: 'transactionId: ' + response['client_transaction'] + ' doesnot exit!!..'
+                });
+            }
+        });
     }
     else if(response['method'] == 'notifyFailedPayment'){
         liveTransactionsModel.findOne({
@@ -209,24 +245,41 @@ transactionsRoute.post('/deposit/update', (req, res, body) => {
                 transaction_ref: response['client_transaction'],
                 msisdn: response['msisdn']
             }
-        }).then(() => {
-            liveTransactionsModel.update({
-                transaction_status: 'Failed',
-                payLeoReferenceId: response['referenceid']
-            },{
-                where: {
-                    transaction_ref: response['client_transaction']
-                }
-            })
+        }).then(tranz => {
+            if(tranz){
+                liveTransactionsModel.update({
+                    transaction_status: 'FAILED',
+                    payLeoReferenceId: response['referenceid']
+                },{
+                    where: {
+                        transaction_ref: response['client_transaction']
+                    }
+                }).then(() => {
+                    const callbackResponseData = {
+                        method: response['method'],
+                        msisdn: response['msisdn'],
+                        amount: response['amount'],
+                        transactionId: response['client_transaction'],
+                        message: response['message']
+                    }
+    
+                    fetch(tranz.callback_url, {
+                        method: 'POST',
+                        body: JSON.stringify(callbackResponseData), 
+                        headers: { 'Content-Type': 'application/json' }
+                    })
+                    .then(res => res.json())
+                    .then(response => {});
+                });
+            }
+            else{
+                res.json({
+                    status: 'FAILED',
+                    code: 204,
+                    message: 'transactionId: ' + response['client_transaction'] + ' doesnot exit!!..'
+                });
+            }
         });
-        
-        res.json({
-            method: response['method'],
-            msisdn: response['msisdn'],
-            amount: response['amount'],
-            transactionId: response['client_transaction'],
-            message: response['message']
-        })
     }
     else{
         res.json({message: 'Something went wrong'});
@@ -242,6 +295,16 @@ transactionsRoute.get('/', (req, res) => {
             ['created_at', 'DESC'],
             ['time_at', 'DESC']
         ]
+    }).then(transfers => res.json({ transfers }));
+});
+
+/////////////////////////////////////Get all transactions by business code//////////////////////////////////////////////////////////////
+transactionsRoute.get('/:busness_code', (req, res) => {
+    LiveTransactionModel.findOne({
+        where: {
+            business_code: req.params.business_code,
+        }
+
     }).then(transfers => res.json({ transfers }));
 });
 
@@ -301,23 +364,13 @@ transactionsRoute.get('/annual/report/:business_code/:year', (req, res) => {
     }).then(transfers => res.json({ transfers }));
 });
 
-/////////////////////////////////////Get all transactions by business code//////////////////////////////////////////////////////////////
-transactionsRoute.get('/:busness_code', (req, res) => {
-    LiveTransactionModel.findOne({
-        where: {
-            business_code: req.params.business_code,
-        }
-
-    }).then(transfers => res.json({ transfers }));
-});
-
 /////////////////////////////////////Get all transactions value//////////////////////////////////////////////////////////////
 transactionsRoute.get('/gpaid/Vendors/all/depositValue', (req, res) => {
     LiveTransactionModel.sum(
         'amount', 
         {
             where: { 
-                transaction_status: 'Success', 
+                transaction_status: 'SUCCESS', 
                 month: monthNames[date.getMonth()], 
                 year: date.getFullYear()
             }
@@ -327,43 +380,43 @@ transactionsRoute.get('/gpaid/Vendors/all/depositValue', (req, res) => {
 
 /////////////////////////////////////Get all transactions value by business code/////////////////////////////////////////////
 transactionsRoute.get('/gpaidVendors/all/depositValue/:business_code', (req, res) => {    
-LiveTransactionModel.sum(
-            'amount', 
-            {
-                where: { 
-                    business_code: req.params.business_code,
-                    transaction_status: 'Success', 
-                    month: monthNames[date.getMonth()], 
-                    year: date.getFullYear()
-                }
+    LiveTransactionModel.sum(
+        'amount', 
+        {
+            where: { 
+                business_code: req.params.business_code,
+                transaction_status: 'SUCCESS', 
+                month: monthNames[date.getMonth()], 
+                year: date.getFullYear()
             }
-        ).then(money => {
-            res.json({money})
-            console.log(money)
+        }
+    ).then(money => {
+        res.json({money})
+        console.log(money)
 
-            if(money == null){
-                AccountsModel.update({
-                    actual_balance: '0.00',
-                    commission: '0.00',
-                    available_balance: '0.00'
-                },{
-                    where: {business_code: req.params.business_code}
-                });
-            }else{
-                var actual = money;
-                var comm = (money) * (5 / 100);
-                var available = actual - comm;
+        if(money == null){
+            AccountsModel.update({
+                actual_balance: '0.00',
+                commission: '0.00',
+                available_balance: '0.00'
+            },{
+                where: {business_code: req.params.business_code}
+            });
+        }else{
+            var actual = money;
+            var comm = (money) * (5 / 100);
+            var available = actual - comm;
 
-                AccountsModel.update({
-                    actual_balance: actual,
-                    commission: comm,
-                    available_balance: available,
-                    created_at: today + ' ' + currentTime
-                },{
-                    where: {business_code: req.params.business_code}
-                });
-            }
-        });
+            AccountsModel.update({
+                actual_balance: actual,
+                commission: comm,
+                available_balance: available,
+                created_at: today + ' ' + currentTime
+            },{
+                where: {business_code: req.params.business_code}
+            });
+        }
+    });
 });
 
 /////////////////////////////////////Get all transactions//////////////////////////////////////////////////////////////

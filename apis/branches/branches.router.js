@@ -47,6 +47,7 @@ BranchRoute.post('/register', (req, res) => {
         bank_branch: req.body.bank_branch,
         bank_accountName: req.body.bank_accountName,
         bank_accountNumber: req.body.bank_accountNumber,
+        callback_url: '',
         created_at: today,
         time_at: currentTime
     }
