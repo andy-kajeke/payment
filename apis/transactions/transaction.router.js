@@ -79,7 +79,7 @@ transactionsRoute.post('/deposit', (req, res) => {
             message: 'Missing required parameters'
         });
     }
-    else if(msisdn.toString().length < 12)
+    else if(msisdn.length < 12)
     {
         res.json({
             status: 'FAILED',
@@ -87,7 +87,7 @@ transactionsRoute.post('/deposit', (req, res) => {
             message: 'Ivaild msisdn. msisdn is either incomplete or doesnot begin with 256'
         });
     }
-    else if(msisdn.toString().length > 12)
+    else if(msisdn.length > 12)
     {
         res.json({
             status: 'FAILED',
@@ -95,7 +95,7 @@ transactionsRoute.post('/deposit', (req, res) => {
             message: 'Ivaild msisdn. msisdn exceeds 12 digits'
         });
     }
-    else if(msisdn == '' && amount == '' && business_code == '')
+    else if(Number(msisdn) == '' && amount == '' && business_code == '')
     {
         res.json({
             status: 'FAILED',
@@ -108,7 +108,7 @@ transactionsRoute.post('/deposit', (req, res) => {
         body: JSON.stringify(depositData), 
         headers: { 'Content-Type': 'application/json' }
         })
-        .then(res => res.json())
+        .then(res => res.json()) 
         .then(response => {
         console.log(response.message)
         //response.message == "Transaction is being processed"
@@ -169,19 +169,21 @@ transactionsRoute.post('/deposit', (req, res) => {
             });
             
         }
-        else{
+        else if(response.message == "Ip is not authorized"){
             res.json({
                 status: 'FAILED',
                 code: 204,
-                message : 'Something went wrong try again or contact service provider for help'
+                message : response.message
             });
         }
-        res.json({
-            status : response.status,
-            code : response.code,
-            message : response.message,
-            transactionId : response.transactionId
-        })
+        else{
+            res.json({
+                status : response.status,
+                code : response.code,
+                message : 'Something went wrong try again or contact service provider for help'
+            })
+        }
+        
     });
     }
     

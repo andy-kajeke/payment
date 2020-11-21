@@ -114,6 +114,7 @@ BranchRoute.put('/update-info/:business_code', (req, res) => {
         bank_branch: req.body.bank_branch,
         bank_accountName: req.body.bank_accountName,
         bank_accontNumber: req.body.bank_accontNumber,
+        callback_url: '',
         created_at: today,
         time_at: currentTime
     }, {
@@ -124,5 +125,21 @@ BranchRoute.put('/update-info/:business_code', (req, res) => {
         message: 'Updated successfully..'
     }))
 });
+
+/////////////////////////////////////Update branch record by business code////////////////////////////////////////////
+BranchRoute.put('/update/callbackUrl:business_code', (req, res) => {
+    BranchModel.update({
+        callback_url: req.body.callback_url,
+        created_at: today,
+        time_at: currentTime
+    }, {
+        where: {
+            business_code: req.params.business_code
+        }
+    }).then(user => res.json({
+        message: 'Updated successfully..'
+    }))
+});
+
 
 module.exports = BranchRoute;
